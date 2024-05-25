@@ -10,3 +10,4 @@ $ cargo run
 - Left click to place alive cell
 - Right click to place dead cell
 - Space to calculate next tick
+- R to randomly fill grid with dead/alive cells

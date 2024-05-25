@@ -10,6 +10,7 @@ use piston::{
     Button, EventSettings, Events, Key, MouseButton, MouseCursorEvent, PressEvent, RenderEvent,
     WindowSettings,
 };
+use rand::{thread_rng, Rng};
 
 type Colour = [f32; 4];
 
@@ -104,6 +105,14 @@ fn main() {
                 }
             }
             grid = grid_compute;
+        }
+
+        if let Some(Button::Keyboard(Key::R)) = e.press_args() {
+            for row in grid.iter_mut() {
+                for cell in row.iter_mut() {
+                    *cell = thread_rng().gen::<bool>();
+                }
+            }
         }
     }
 }
