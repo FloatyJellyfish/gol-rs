@@ -1,26 +1,20 @@
-#![feature(const_fn_floating_point_arithmetic)]
+extern crate glutin_window;
+extern crate graphics;
+extern crate opengl_graphics;
+extern crate piston;
 
-use glium_graphics::{Glium2d, GliumWindow};
-use glutin_window::OpenGL;
+use glutin_window::GlutinWindow;
 use graphics::*;
+use opengl_graphics::{GlGraphics, OpenGL};
 use piston::{
-    Button, EventLoop, EventSettings, Events, Key, MouseButton, MouseCursorEvent, PressEvent,
-    RenderEvent, WindowSettings,
+    Button, EventSettings, Events, Key, MouseButton, MouseCursorEvent, PressEvent, RenderEvent,
+    WindowSettings,
 };
 
 type Colour = [f32; 4];
 
-const fn rgb(r: u8, g: u8, b: u8, a: u8) -> Colour {
-    [
-        r as f32 / 255.0,
-        g as f32 / 255.0,
-        b as f32 / 255.0,
-        a as f32 / 255.0,
-    ]
-}
-
-const COLOUR_BACKGROUND: Colour = rgb(0x18, 0x18, 0x18, 0x18);
-const COLOUR_CELL: Colour = rgb(255, 255, 255, 255);
+const COLOUR_BACKGROUND: Colour = [0.09, 0.09, 0.09, 1.0];
+const COLOUR_CELL: Colour = [1.0; 4];
 
 const WIDTH: u32 = 500;
 const HEIGHT: u32 = 500;
@@ -29,14 +23,15 @@ const GRID_COLUMNS: u32 = WIDTH / CELL_SIZE;
 const GRID_ROWS: u32 = HEIGHT / CELL_SIZE;
 
 fn main() {
-    let opengl = OpenGL::V4_5;
-    let window: &mut GliumWindow = &mut WindowSettings::new("Gol", [WIDTH, HEIGHT])
+    let opengl = OpenGL::V3_2;
+    let window: &mut GlutinWindow = &mut WindowSettings::new("Gol", [WIDTH, HEIGHT])
+        .graphics_api(opengl)
         .exit_on_esc(true)
         .build()
         .expect("Unable to build window");
 
-    let mut events = Events::new(EventSettings::new().lazy(true));
-    let mut g2d = Glium2d::new(opengl, window);
+    let mut events = Events::new(EventSettings::new());
+    let mut gl = GlGraphics::new(opengl);
 
     let mut grid = [[false; GRID_COLUMNS as usize]; GRID_ROWS as usize];
     let mut grid_compute = [[false; GRID_COLUMNS as usize]; GRID_ROWS as usize];
@@ -44,8 +39,7 @@ fn main() {
 
     while let Some(e) = events.next(window) {
         if let Some(args) = e.render_args() {
-            let mut target = window.draw();
-            g2d.draw(&mut target, args.viewport(), |c, g| {
+            gl.draw(args.viewport(), |c, g| {
                 clear(COLOUR_BACKGROUND, g);
                 for y in 0..GRID_ROWS {
                     for x in 0..GRID_COLUMNS {
@@ -65,7 +59,6 @@ fn main() {
                     }
                 }
             });
-            target.finish().expect("Unable to finish drawing");
         }
 
         if let Some(pos) = e.mouse_cursor_args() {
