@@ -15,11 +15,13 @@ use rand::{thread_rng, Rng};
 type Colour = [f32; 4];
 
 const WIDTH: u32 = 500;
-const HEIGHT: u32 = 500;
+const HEIGHT: u32 = 550;
 
 const COLOUR_BACKGROUND: Colour = [0.09, 0.09, 0.09, 1.0];
 const COLOUR_ALIVE_CELL: Colour = [1.0; 4];
 const COLOUR_DEAD_CELL: Colour = COLOUR_BACKGROUND;
+const COLOUR_BUTTON: Colour = [1.0; 4];
+const COLOUR_BUTTON_HOVER: Colour = [0.8, 0.8, 0.8, 1.0];
 
 struct Grid<const COL: usize, const ROW: usize> {
     x: u32,
@@ -98,32 +100,7 @@ impl<const COL: usize, const ROW: usize> Grid<COL, ROW> {
         }
 
         if let Button::Keyboard(Key::Space) = button {
-            for y in 0..self.cells.len() {
-                for x in 0..self.cells[y].len() {
-                    let neighbours = count_neighbours(&self.cells, x as i32, y as i32);
-                    self.compute[y][x] = if self.cells[y][x] {
-                        // Cell is alive
-                        if neighbours < 2 {
-                            // Underpopulation
-                            false
-                        } else if neighbours == 2 || neighbours == 3 {
-                            true
-                        } else {
-                            // Overpopulation
-                            false
-                        }
-                    } else {
-                        // Cell is dead
-                        if neighbours == 3 {
-                            // Reproduction
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                }
-            }
-            self.cells = self.compute;
+            self.calc_next();
         }
 
         if let Button::Keyboard(Key::R) = button {
@@ -133,6 +110,110 @@ impl<const COL: usize, const ROW: usize> Grid<COL, ROW> {
                 }
             }
         }
+    }
+
+    fn calc_next(&mut self) {
+        for y in 0..self.cells.len() {
+            for x in 0..self.cells[y].len() {
+                let neighbours = count_neighbours(&self.cells, x as i32, y as i32);
+                self.compute[y][x] = if self.cells[y][x] {
+                    // Cell is alive
+                    if neighbours < 2 {
+                        // Underpopulation
+                        false
+                    } else if neighbours == 2 || neighbours == 3 {
+                        true
+                    } else {
+                        // Overpopulation
+                        false
+                    }
+                } else {
+                    // Cell is dead
+                    if neighbours == 3 {
+                        // Reproduction
+                        true
+                    } else {
+                        false
+                    }
+                }
+            }
+        }
+        self.cells = self.compute;
+    }
+}
+
+trait Btn {
+    fn new(x: u32, y: u32, width: u32, height: u32) -> Self;
+
+    fn render(&self, gl: &mut GlGraphics, args: &RenderArgs);
+
+    fn mouse_cursor(&mut self, pos: [f64; 2]);
+
+    fn is_pressed(&self, button: &Button) -> bool;
+}
+
+struct Next {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    hover: bool,
+}
+
+impl Btn for Next {
+    fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
+        Self {
+            x: x as f64,
+            y: y as f64,
+            width: width as f64,
+            height: height as f64,
+            hover: false,
+        }
+    }
+
+    fn render(&self, gl: &mut GlGraphics, args: &RenderArgs) {
+        gl.draw(args.viewport(), |c, g| {
+            let colour = if self.hover {
+                COLOUR_BUTTON_HOVER
+            } else {
+                COLOUR_BUTTON
+            };
+            let pad = self.width / 5.0;
+            Polygon::new(colour).draw(
+                &[
+                    [self.x + pad, self.y + pad],
+                    [self.x + pad, self.y + self.height - pad],
+                    [self.x + self.width - pad, self.y + (self.height / 2.0)],
+                ],
+                &DrawState::new_alpha(),
+                c.transform,
+                g,
+            );
+            let bar_width = self.width / 10.0;
+            let bar_height = self.height - 2.0 * pad;
+            Rectangle::new(colour).draw(
+                [
+                    self.x + self.width - pad - bar_width,
+                    self.y + pad,
+                    bar_width,
+                    bar_height,
+                ],
+                &DrawState::new_alpha(),
+                c.transform,
+                g,
+            );
+        })
+    }
+
+    fn mouse_cursor(&mut self, pos: [f64; 2]) {
+        self.hover = pos[0] > self.x
+            && pos[0] < self.x + self.width
+            && pos[1] > self.y
+            && pos[1] < self.y + self.height;
+    }
+
+    fn is_pressed(&self, button: &Button) -> bool {
+        Button::Mouse(MouseButton::Left) == *button && self.hover
     }
 }
 
@@ -147,23 +228,29 @@ fn main() {
     let mut events = Events::new(EventSettings::new());
     let mut gl = GlGraphics::new(opengl);
 
-    let mut grid: Grid<50, 50> = Grid::new(0, 0, 500, 500);
+    let mut grid: Grid<50, 50> = Grid::new(0, 50, 500, 500);
+    let mut next = Next::new((WIDTH / 2) - (50 / 2), 0, 50, 50);
     let mut mouse_pos = [0.0, 0.0];
 
     while let Some(e) = events.next(window) {
         if let Some(args) = e.render_args() {
             gl.draw(args.viewport(), |_c, g| {
-                clear([1.0; 4], g);
+                clear(COLOUR_BACKGROUND, g);
             });
             grid.render(&mut gl, &args);
+            next.render(&mut gl, &args);
         }
 
         if let Some(pos) = e.mouse_cursor_args() {
             mouse_pos = pos;
+            next.mouse_cursor(pos);
         }
 
         if let Some(button) = e.press_args() {
             grid.press(button, mouse_pos);
+            if next.is_pressed(&button) {
+                grid.calc_next();
+            }
         }
     }
 }
