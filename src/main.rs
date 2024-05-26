@@ -3,6 +3,8 @@ extern crate graphics;
 extern crate opengl_graphics;
 extern crate piston;
 
+use std::time::SystemTime;
+
 use glutin_window::GlutinWindow;
 use graphics::*;
 use opengl_graphics::{GlGraphics, OpenGL};
@@ -83,20 +85,26 @@ impl<const COL: usize, const ROW: usize> Grid<COL, ROW> {
     }
 
     fn press(&mut self, button: Button, mut mouse_pos: [f64; 2]) {
-        mouse_pos[0] -= self.x as f64;
-        mouse_pos[1] -= self.y as f64;
-        let cell_width = self.width as usize / COL;
-        let cell_height = self.height as usize / ROW;
-        if let Button::Mouse(MouseButton::Left) = button {
-            let x = mouse_pos[0] as usize / cell_width;
-            let y = mouse_pos[1] as usize / cell_height;
-            self.cells[y][x] = true;
-        }
+        if mouse_pos[0] > self.x as f64
+            && mouse_pos[0] < self.x as f64 + self.width as f64
+            && mouse_pos[1] > self.y as f64
+            && mouse_pos[1] < self.y as f64 + self.width as f64
+        {
+            mouse_pos[0] -= self.x as f64;
+            mouse_pos[1] -= self.y as f64;
+            let cell_width = self.width as usize / COL;
+            let cell_height = self.height as usize / ROW;
+            if let Button::Mouse(MouseButton::Left) = button {
+                let x = mouse_pos[0] as usize / cell_width;
+                let y = mouse_pos[1] as usize / cell_height;
+                self.cells[y][x] = true;
+            }
 
-        if let Button::Mouse(MouseButton::Right) = button {
-            let x = mouse_pos[0] as usize / cell_width;
-            let y = mouse_pos[1] as usize / cell_height;
-            self.cells[y][x] = false;
+            if let Button::Mouse(MouseButton::Right) = button {
+                let x = mouse_pos[0] as usize / cell_width;
+                let y = mouse_pos[1] as usize / cell_height;
+                self.cells[y][x] = false;
+            }
         }
 
         if let Button::Keyboard(Key::Space) = button {
@@ -149,7 +157,7 @@ trait Btn {
 
     fn mouse_cursor(&mut self, pos: [f64; 2]);
 
-    fn is_pressed(&self, button: &Button) -> bool;
+    fn is_pressed(&mut self, button: &Button) -> bool;
 }
 
 struct Next {
@@ -212,8 +220,93 @@ impl Btn for Next {
             && pos[1] < self.y + self.height;
     }
 
-    fn is_pressed(&self, button: &Button) -> bool {
+    fn is_pressed(&mut self, button: &Button) -> bool {
         Button::Mouse(MouseButton::Left) == *button && self.hover
+    }
+}
+
+struct Play {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    hover: bool,
+    toggle: bool,
+}
+
+impl Btn for Play {
+    fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
+        Self {
+            x: x as f64,
+            y: y as f64,
+            width: width as f64,
+            height: height as f64,
+            hover: false,
+            toggle: false,
+        }
+    }
+
+    fn render(&self, gl: &mut GlGraphics, args: &RenderArgs) {
+        let colour = if self.hover {
+            COLOUR_BUTTON_HOVER
+        } else {
+            COLOUR_BUTTON
+        };
+        let pad = self.width / 5.0;
+        if self.toggle {
+            gl.draw(args.viewport(), |c, g| {
+                Rectangle::new(colour).draw(
+                    [
+                        self.x + pad,
+                        self.y + pad,
+                        self.width / 5.0,
+                        self.height - pad * 2.0,
+                    ],
+                    &DrawState::new_alpha(),
+                    c.transform,
+                    g,
+                );
+                Rectangle::new(colour).draw(
+                    [
+                        self.x + self.width - pad - (self.width / 5.0),
+                        self.y + pad,
+                        self.width / 5.0,
+                        self.height - pad * 2.0,
+                    ],
+                    &DrawState::new_alpha(),
+                    c.transform,
+                    g,
+                );
+            })
+        } else {
+            gl.draw(args.viewport(), |c, g| {
+                Polygon::new(colour).draw(
+                    &[
+                        [self.x + pad, self.y + pad],
+                        [self.x + pad, self.y + self.height - pad],
+                        [self.x + self.width - pad, self.y + (self.height / 2.0)],
+                    ],
+                    &DrawState::new_alpha(),
+                    c.transform,
+                    g,
+                );
+            })
+        }
+    }
+
+    fn mouse_cursor(&mut self, pos: [f64; 2]) {
+        self.hover = pos[0] > self.x
+            && pos[0] < self.x + self.width
+            && pos[1] > self.y
+            && pos[1] < self.y + self.height;
+    }
+
+    fn is_pressed(&mut self, button: &Button) -> bool {
+        if *button == Button::Mouse(MouseButton::Left) && self.hover {
+            self.toggle = !self.toggle;
+            return true;
+        }
+        false
     }
 }
 
@@ -229,8 +322,11 @@ fn main() {
     let mut gl = GlGraphics::new(opengl);
 
     let mut grid: Grid<50, 50> = Grid::new(0, 50, 500, 500);
-    let mut next = Next::new((WIDTH / 2) - (50 / 2), 0, 50, 50);
+    let mut next = Next::new((WIDTH / 2) - 50, 0, 50, 50);
+    let mut play = Play::new(WIDTH / 2, 0, 50, 50);
     let mut mouse_pos = [0.0, 0.0];
+    let mut playing = false;
+    let mut last_tick = SystemTime::now();
 
     while let Some(e) = events.next(window) {
         if let Some(args) = e.render_args() {
@@ -239,11 +335,13 @@ fn main() {
             });
             grid.render(&mut gl, &args);
             next.render(&mut gl, &args);
+            play.render(&mut gl, &args);
         }
 
         if let Some(pos) = e.mouse_cursor_args() {
             mouse_pos = pos;
             next.mouse_cursor(pos);
+            play.mouse_cursor(pos);
         }
 
         if let Some(button) = e.press_args() {
@@ -251,6 +349,18 @@ fn main() {
             if next.is_pressed(&button) {
                 grid.calc_next();
             }
+
+            if play.is_pressed(&button) {
+                playing = !playing;
+            }
+        }
+
+        if playing && SystemTime::now()
+                .duration_since(last_tick)
+                .expect("Time went backwards")
+                .as_millis() > 250 {
+            last_tick = SystemTime::now();
+            grid.calc_next();
         }
     }
 }
