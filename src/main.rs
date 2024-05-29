@@ -6,7 +6,7 @@ extern crate piston;
 use std::time::SystemTime;
 
 use glutin_window::GlutinWindow;
-use graphics::*;
+use graphics::{ellipse::centered, *};
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::{
     Button, EventSettings, Events, Key, MouseButton, MouseCursorEvent, PressEvent, RenderArgs,
@@ -112,11 +112,7 @@ impl<const COL: usize, const ROW: usize> Grid<COL, ROW> {
         }
 
         if let Button::Keyboard(Key::R) = button {
-            for row in self.cells.iter_mut() {
-                for cell in row.iter_mut() {
-                    *cell = thread_rng().gen::<bool>();
-                }
-            }
+            self.randomize();
         }
     }
 
@@ -147,6 +143,14 @@ impl<const COL: usize, const ROW: usize> Grid<COL, ROW> {
             }
         }
         self.cells = self.compute;
+    }
+
+    fn randomize(&mut self) {
+        for row in self.cells.iter_mut() {
+            for cell in row.iter_mut() {
+                *cell = thread_rng().gen::<bool>();
+            }
+        }
     }
 }
 
@@ -310,6 +314,72 @@ impl Btn for Play {
     }
 }
 
+struct Random {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    hover: bool,
+}
+
+impl Btn for Random {
+    fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
+        Self {
+            x: x as f64,
+            y: y as f64,
+            width: width as f64,
+            height: height as f64,
+            hover: false,
+        }
+    }
+
+    fn render(&self, gl: &mut GlGraphics, args: &RenderArgs) {
+        let colour = if self.hover {
+            COLOUR_BUTTON_HOVER
+        } else {
+            COLOUR_BUTTON
+        };
+        let pad = self.width / 5.0;
+        let btn_width = self.width - 2.0 * pad;
+        let btn_height = self.height - 2.0 * pad;
+        gl.draw(args.viewport(), |c, g| {
+            Rectangle::new_round(colour, 5.0).draw(
+                [self.x + pad, self.y + pad, btn_width, btn_height],
+                &DrawState::new_alpha(),
+                c.transform,
+                g,
+            );
+            let dot_size = 3.25;
+            for x in 0..2 {
+                for y in 0..3 {
+                    let cx = self.x + pad + (x + 1) as f64 * (btn_width / 3.0);
+                    let cy = self.y + pad + (y + 1) as f64 * ((btn_height) / 4.0);
+                    Ellipse::new(COLOUR_BACKGROUND).draw(
+                        centered([cx, cy, dot_size, dot_size]),
+                        &DrawState::new_alpha(),
+                        c.transform,
+                        g,
+                    );
+                }
+            }
+        });
+    }
+
+    fn mouse_cursor(&mut self, pos: [f64; 2]) {
+        self.hover = pos[0] > self.x
+            && pos[0] < self.x + self.width
+            && pos[1] > self.y
+            && pos[1] < self.y + self.height;
+    }
+
+    fn is_pressed(&mut self, button: &Button) -> bool {
+        if *button == Button::Mouse(MouseButton::Left) && self.hover {
+            return true;
+        }
+        false
+    }
+}
+
 fn main() {
     let opengl = OpenGL::V3_2;
     let window: &mut GlutinWindow = &mut WindowSettings::new("Gol", [WIDTH, HEIGHT])
@@ -322,8 +392,9 @@ fn main() {
     let mut gl = GlGraphics::new(opengl);
 
     let mut grid: Grid<50, 50> = Grid::new(0, 50, 500, 500);
-    let mut next = Next::new((WIDTH / 2) - 50, 0, 50, 50);
-    let mut play = Play::new(WIDTH / 2, 0, 50, 50);
+    let mut next = Next::new((WIDTH / 2) - 75, 0, 50, 50);
+    let mut play = Play::new((WIDTH / 2) - 25, 0, 50, 50);
+    let mut random = Random::new((WIDTH / 2) + 25, 0, 50, 50);
     let mut mouse_pos = [0.0, 0.0];
     let mut playing = false;
     let mut last_tick = SystemTime::now();
@@ -336,12 +407,14 @@ fn main() {
             grid.render(&mut gl, &args);
             next.render(&mut gl, &args);
             play.render(&mut gl, &args);
+            random.render(&mut gl, &args);
         }
 
         if let Some(pos) = e.mouse_cursor_args() {
             mouse_pos = pos;
             next.mouse_cursor(pos);
             play.mouse_cursor(pos);
+            random.mouse_cursor(pos);
         }
 
         if let Some(button) = e.press_args() {
@@ -353,12 +426,19 @@ fn main() {
             if play.is_pressed(&button) {
                 playing = !playing;
             }
+
+            if random.is_pressed(&button) {
+                grid.randomize();
+            }
         }
 
-        if playing && SystemTime::now()
+        if playing
+            && SystemTime::now()
                 .duration_since(last_tick)
                 .expect("Time went backwards")
-                .as_millis() > 250 {
+                .as_millis()
+                > 250
+        {
             last_tick = SystemTime::now();
             grid.calc_next();
         }
