@@ -595,6 +595,7 @@ struct Speed {
 }
 
 impl Speed {
+    #[allow(clippy::too_many_arguments)]
     fn new(
         x: u32,
         y: u32,
@@ -668,7 +669,7 @@ fn main() {
     let mut next = Next::new((WIDTH / 2) - 150, 0, 50, 50);
     let mut play = Play::new((WIDTH / 2) - 100, 0, 50, 50);
     let mut random = Random::new(WIDTH / 2 - 50, 0, 50, 50);
-    let mut decrease = Decrease::new(WIDTH / 2 + 0, 0, 50, 50);
+    let mut decrease = Decrease::new(WIDTH / 2, 0, 50, 50);
     let mut speed = Speed::new(WIDTH / 2 + 50, 0, 50, 50, 4, 1, 16, 30);
     let mut increase = Increase::new((WIDTH / 2) + 100, 0, 50, 50);
 
