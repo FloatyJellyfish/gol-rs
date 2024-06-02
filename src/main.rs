@@ -6,8 +6,8 @@ extern crate piston;
 use std::time::SystemTime;
 
 use glutin_window::GlutinWindow;
-use graphics::{ellipse::centered, *};
-use opengl_graphics::{GlGraphics, OpenGL};
+use graphics::{ellipse::centered, types::FontSize, *};
+use opengl_graphics::{GlGraphics, GlyphCache, OpenGL, TextureSettings};
 use piston::{
     Button, EventSettings, Events, Key, MouseButton, MouseCursorEvent, PressEvent, RenderArgs,
     RenderEvent, WindowSettings,
@@ -453,6 +453,204 @@ impl Btn for Random {
     }
 }
 
+struct Increase {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    hover: bool,
+}
+
+impl Btn for Increase {
+    fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
+        Self {
+            x: x as f64,
+            y: y as f64,
+            width: width as f64,
+            height: height as f64,
+            hover: false,
+        }
+    }
+
+    fn render(&self, gl: &mut GlGraphics, args: &RenderArgs) {
+        let colour = if self.hover {
+            COLOUR_HOVER
+        } else {
+            COLOUR_BUTTON
+        };
+        let pad = self.width / 5.0;
+        gl.draw(args.viewport(), |c, g| {
+            Polygon::new(colour).draw(
+                &[
+                    [self.x + pad, self.y + pad],
+                    [self.x + pad, self.y + self.height - pad],
+                    [self.x + self.width / 2.0, self.y + self.height / 2.0],
+                ],
+                &DrawState::new_alpha(),
+                c.transform,
+                g,
+            );
+            Polygon::new(colour).draw(
+                &[
+                    [self.x + self.width / 2.0, self.y + pad],
+                    [self.x + self.width / 2.0, self.y + self.height - pad],
+                    [self.x + self.width - pad, self.y + self.width / 2.0],
+                ],
+                &DrawState::new_alpha(),
+                c.transform,
+                g,
+            );
+        });
+    }
+
+    fn mouse_cursor(&mut self, pos: [f64; 2]) {
+        self.hover = pos[0] > self.x
+            && pos[0] < self.x + self.width
+            && pos[1] > self.y
+            && pos[1] < self.y + self.height;
+    }
+
+    fn is_pressed(&mut self, button: &Button) -> bool {
+        if *button == Button::Mouse(MouseButton::Left) && self.hover {
+            return true;
+        }
+        false
+    }
+}
+
+struct Decrease {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    hover: bool,
+}
+
+impl Btn for Decrease {
+    fn new(x: u32, y: u32, width: u32, height: u32) -> Self {
+        Self {
+            x: x as f64,
+            y: y as f64,
+            width: width as f64,
+            height: height as f64,
+            hover: false,
+        }
+    }
+
+    fn render(&self, gl: &mut GlGraphics, args: &RenderArgs) {
+        let colour = if self.hover {
+            COLOUR_HOVER
+        } else {
+            COLOUR_BUTTON
+        };
+        let pad = self.width / 5.0;
+        gl.draw(args.viewport(), |c, g| {
+            Polygon::new(colour).draw(
+                &[
+                    [self.x + self.width / 2.0, self.y + pad],
+                    [self.x + self.width / 2.0, self.y + self.height - pad],
+                    [self.x + pad, self.y + self.height / 2.0],
+                ],
+                &DrawState::new_alpha(),
+                c.transform,
+                g,
+            );
+            Polygon::new(colour).draw(
+                &[
+                    [self.x + self.width - pad, self.y + pad],
+                    [self.x + self.width - pad, self.y + self.height - pad],
+                    [self.x + self.width / 2.0, self.y + self.width / 2.0],
+                ],
+                &DrawState::new_alpha(),
+                c.transform,
+                g,
+            );
+        });
+    }
+
+    fn mouse_cursor(&mut self, pos: [f64; 2]) {
+        self.hover = pos[0] > self.x
+            && pos[0] < self.x + self.width
+            && pos[1] > self.y
+            && pos[1] < self.y + self.height;
+    }
+
+    fn is_pressed(&mut self, button: &Button) -> bool {
+        if *button == Button::Mouse(MouseButton::Left) && self.hover {
+            return true;
+        }
+        false
+    }
+}
+
+struct Speed {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    speed: usize,
+    min: usize,
+    max: usize,
+    font_size: FontSize,
+}
+
+impl Speed {
+    fn new(
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
+        speed: usize,
+        min: usize,
+        max: usize,
+        font_size: FontSize,
+    ) -> Self {
+        Self {
+            x: x as f64,
+            y: y as f64,
+            width: width as f64,
+            height: height as f64,
+            speed,
+            min,
+            max,
+            font_size,
+        }
+    }
+
+    fn render(&self, gl: &mut GlGraphics, args: &RenderArgs, glyph_cache: &mut GlyphCache) {
+        let text = format!("{}x", self.speed);
+        let x = self.x + self.width / 2.0
+            - glyph_cache
+                .width(self.font_size, &text)
+                .expect("Unable to measure text") as f64
+                / 2.0;
+        let y = self.y + self.height / 2.0 + self.font_size as f64 / 2.0 - 5.0;
+        gl.draw(args.viewport(), |c, g| {
+            Text::new_color(COLOUR_BUTTON, self.font_size)
+                .draw(
+                    &text,
+                    glyph_cache,
+                    &DrawState::default(),
+                    c.transform.trans(x, y),
+                    g,
+                )
+                .expect("Unable to draw text");
+        });
+    }
+
+    fn increase(&mut self) {
+        if self.speed < self.max {
+            self.speed *= 2;
+        }
+    }
+
+    fn decrease(&mut self) {
+        if self.speed > self.min {
+            self.speed /= 2;
+        }
+    }
+}
+
 fn main() {
     let opengl = OpenGL::V3_2;
     let window: &mut GlutinWindow = &mut WindowSettings::new("Gol", [WIDTH, HEIGHT])
@@ -463,11 +661,17 @@ fn main() {
 
     let mut events = Events::new(EventSettings::new());
     let mut gl = GlGraphics::new(opengl);
+    let mut glyph_cache =
+        GlyphCache::new("fonts/Nexa-Heavy.ttf", (), TextureSettings::new()).unwrap();
 
     let mut grid: Grid<50, 50> = Grid::new(0, 50, 500, 500);
-    let mut next = Next::new((WIDTH / 2) - 75, 0, 50, 50);
-    let mut play = Play::new((WIDTH / 2) - 25, 0, 50, 50);
-    let mut random = Random::new((WIDTH / 2) + 25, 0, 50, 50);
+    let mut next = Next::new((WIDTH / 2) - 150, 0, 50, 50);
+    let mut play = Play::new((WIDTH / 2) - 100, 0, 50, 50);
+    let mut random = Random::new(WIDTH / 2 - 50, 0, 50, 50);
+    let mut decrease = Decrease::new(WIDTH / 2 + 0, 0, 50, 50);
+    let mut speed = Speed::new(WIDTH / 2 + 50, 0, 50, 50, 4, 1, 16, 30);
+    let mut increase = Increase::new((WIDTH / 2) + 100, 0, 50, 50);
+
     let mut mouse_pos = [0.0, 0.0];
     let mut playing = false;
     let mut last_tick = SystemTime::now();
@@ -481,6 +685,9 @@ fn main() {
             next.render(&mut gl, &args);
             play.render(&mut gl, &args);
             random.render(&mut gl, &args);
+            decrease.render(&mut gl, &args);
+            increase.render(&mut gl, &args);
+            speed.render(&mut gl, &args, &mut glyph_cache)
         }
 
         if let Some(pos) = e.mouse_cursor_args() {
@@ -489,6 +696,8 @@ fn main() {
             next.mouse_cursor(pos);
             play.mouse_cursor(pos);
             random.mouse_cursor(pos);
+            decrease.mouse_cursor(pos);
+            increase.mouse_cursor(pos);
         }
 
         if let Some(button) = e.press_args() {
@@ -504,6 +713,14 @@ fn main() {
             if random.is_pressed(&button) {
                 grid.randomize();
             }
+
+            if increase.is_pressed(&button) {
+                speed.increase();
+            }
+
+            if decrease.is_pressed(&button) {
+                speed.decrease();
+            }
         }
 
         if playing
@@ -511,7 +728,7 @@ fn main() {
                 .duration_since(last_tick)
                 .expect("Time went backwards")
                 .as_millis()
-                > 250
+                > (1000 / speed.speed as u128)
         {
             last_tick = SystemTime::now();
             grid.calc_next();
