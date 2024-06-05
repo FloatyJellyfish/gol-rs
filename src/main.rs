@@ -12,7 +12,10 @@ use piston::{
     Button, EventSettings, Events, Key, MouseButton, MouseCursorEvent, PressEvent, RenderArgs,
     RenderEvent, WindowSettings,
 };
-use rand::{thread_rng, Rng};
+use rand::{
+    distributions::{Distribution, Standard},
+    random, thread_rng, Rng,
+};
 use rectangle::Border;
 
 type Colour = [f32; 4];
@@ -387,12 +390,38 @@ impl Btn for Play {
     }
 }
 
+#[derive(PartialEq)]
+enum Dice {
+    One,
+    Two,
+    Three,
+    Four,
+    Five,
+    Six,
+}
+
+impl Distribution<Dice> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> Dice {
+        let index: u8 = rng.gen_range(1..=6);
+        match index {
+            1 => Dice::One,
+            2 => Dice::Two,
+            3 => Dice::Three,
+            4 => Dice::Four,
+            5 => Dice::Five,
+            6 => Dice::Six,
+            _ => unreachable!(),
+        }
+    }
+}
+
 struct Random {
     x: f64,
     y: f64,
     width: f64,
     height: f64,
     hover: bool,
+    dice_state: Dice,
 }
 
 impl Btn for Random {
@@ -403,6 +432,7 @@ impl Btn for Random {
             width: width as f64,
             height: height as f64,
             hover: false,
+            dice_state: Dice::Six,
         }
     }
 
@@ -423,16 +453,97 @@ impl Btn for Random {
                 g,
             );
             let dot_size = 3.25;
-            for x in 0..2 {
-                for y in 0..3 {
-                    let cx = self.x + pad + (x + 1) as f64 * (btn_width / 3.0);
-                    let cy = self.y + pad + (y + 1) as f64 * ((btn_height) / 4.0);
-                    Ellipse::new(COLOUR_BACKGROUND).draw(
-                        centered([cx, cy, dot_size, dot_size]),
-                        &DrawState::new_alpha(),
-                        c.transform,
-                        g,
-                    );
+            match self.dice_state {
+                Dice::One => Ellipse::new(COLOUR_BACKGROUND).draw(
+                    centered([
+                        self.x + self.width / 2.0,
+                        self.y + self.height / 2.0,
+                        dot_size,
+                        dot_size,
+                    ]),
+                    &DrawState::default(),
+                    c.transform,
+                    g,
+                ),
+                Dice::Two => {
+                    for x in 1..=2 {
+                        Ellipse::new(COLOUR_BACKGROUND).draw(
+                            centered([
+                                self.x + self.height / 2.0,
+                                self.y + pad + x as f64 * (self.height - 2.0 * pad) / 3.0,
+                                dot_size,
+                                dot_size,
+                            ]),
+                            &DrawState::default(),
+                            c.transform,
+                            g,
+                        );
+                    }
+                }
+                Dice::Three => {
+                    for i in 1..=3 {
+                        Ellipse::new(COLOUR_BACKGROUND).draw(
+                            centered([
+                                self.x + pad + i as f64 * (self.width - 2.0 * pad) / 4.0,
+                                self.y + pad + i as f64 * (self.height - 2.0 * pad) / 4.0,
+                                dot_size,
+                                dot_size,
+                            ]),
+                            &DrawState::default(),
+                            c.transform,
+                            g,
+                        );
+                    }
+                }
+                Dice::Four => {
+                    for x in 1..=2 {
+                        for y in 1..=2 {
+                            Ellipse::new(COLOUR_BACKGROUND).draw(
+                                centered([
+                                    self.x + pad + x as f64 * (self.width - 2.0 * pad) / 3.0,
+                                    self.y + pad + y as f64 * (self.height - 2.0 * pad) / 3.0,
+                                    dot_size,
+                                    dot_size,
+                                ]),
+                                &DrawState::default(),
+                                c.transform,
+                                g,
+                            );
+                        }
+                    }
+                }
+                Dice::Five => {
+                    for x in 1..=3 {
+                        for y in 1..=3 {
+                            if (x != 2 && y != 2) || (x == 2 && y == 2) {
+                                Ellipse::new(COLOUR_BACKGROUND).draw(
+                                    centered([
+                                        self.x + pad + x as f64 * (self.width - 2.0 * pad) / 4.0,
+                                        self.y + pad + y as f64 * (self.height - 2.0 * pad) / 4.0,
+                                        dot_size,
+                                        dot_size,
+                                    ]),
+                                    &DrawState::default(),
+                                    c.transform,
+                                    g,
+                                );
+                            }
+                        }
+                    }
+                }
+                Dice::Six => {
+                    for x in 0..2 {
+                        for y in 0..3 {
+                            let cx = self.x + pad + (x + 1) as f64 * (btn_width / 3.0);
+                            let cy = self.y + pad + (y + 1) as f64 * ((btn_height) / 4.0);
+                            Ellipse::new(COLOUR_BACKGROUND).draw(
+                                centered([cx, cy, dot_size, dot_size]),
+                                &DrawState::new_alpha(),
+                                c.transform,
+                                g,
+                            );
+                        }
+                    }
                 }
             }
         });
@@ -447,6 +558,11 @@ impl Btn for Random {
 
     fn is_pressed(&mut self, button: &Button) -> bool {
         if *button == Button::Mouse(MouseButton::Left) && self.hover {
+            let mut rand = random();
+            while rand == self.dice_state {
+                rand = random();
+            }
+            self.dice_state = rand;
             return true;
         }
         false
