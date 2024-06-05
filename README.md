@@ -7,7 +7,6 @@ $ cargo run
 ```
 
 ## Controls
-- Left click to place alive cell
-- Right click to place dead cell
+- Left click to toggle cell state
 - Space to calculate next tick
 - R to randomly fill grid with dead/alive cells

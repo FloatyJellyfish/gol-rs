@@ -16,7 +16,6 @@ use rand::{
     distributions::{Distribution, Standard},
     random, thread_rng, Rng,
 };
-use rectangle::Border;
 
 type Colour = [f32; 4];
 
@@ -28,6 +27,7 @@ const COLOUR_ALIVE_CELL: Colour = [1.0; 4];
 const COLOUR_DEAD_CELL: Colour = COLOUR_BACKGROUND;
 const COLOUR_BUTTON: Colour = [1.0; 4];
 const COLOUR_HOVER: Colour = [0.8, 0.8, 0.8, 1.0];
+const COLOUR_REMOVE: Colour = [0.8, 0.0, 0.0, 1.0];
 
 struct Grid<const COL: usize, const ROW: usize> {
     x: u32,
@@ -88,31 +88,20 @@ impl<const COL: usize, const ROW: usize> Grid<COL, ROW> {
                 }
             }
             if let Some([x, y]) = self.hover {
-                Rectangle::new([0.0; 4])
-                    .border(Border {
-                        color: COLOUR_HOVER,
-                        radius: 0.0,
-                    })
-                    .draw(
-                        [
-                            self.x as f64 + (x * cell_width) as f64,
-                            self.y as f64 + (y * cell_height) as f64,
-                            cell_width as f64,
-                            cell_height as f64,
-                        ],
-                        &DrawState::new_alpha(),
-                        c.transform,
-                        g,
-                    );
+                let colour = if self.cells[y][x] {
+                    COLOUR_REMOVE
+                } else {
+                    COLOUR_HOVER
+                };
                 let x = self.x as f64 + (x * cell_width) as f64;
                 let y = self.y as f64 + (y * cell_height) as f64;
-                Line::new(COLOUR_HOVER, 1.0).draw(
+                Line::new(colour, 1.0).draw(
                     [x, y, x, y + cell_height as f64],
                     &DrawState::new_alpha(),
                     c.transform,
                     g,
                 );
-                Line::new(COLOUR_HOVER, 1.0).draw(
+                Line::new(colour, 1.0).draw(
                     [
                         x + cell_width as f64,
                         y,
@@ -123,13 +112,13 @@ impl<const COL: usize, const ROW: usize> Grid<COL, ROW> {
                     c.transform,
                     g,
                 );
-                Line::new(COLOUR_HOVER, 1.0).draw(
+                Line::new(colour, 1.0).draw(
                     [x, y, x + cell_width as f64, y],
                     &DrawState::new_alpha(),
                     c.transform,
                     g,
                 );
-                Line::new(COLOUR_HOVER, 1.0).draw(
+                Line::new(colour, 1.0).draw(
                     [
                         x,
                         y + cell_height as f64,
@@ -157,13 +146,7 @@ impl<const COL: usize, const ROW: usize> Grid<COL, ROW> {
             if let Button::Mouse(MouseButton::Left) = button {
                 let x = mouse_pos[0] as usize / cell_width;
                 let y = mouse_pos[1] as usize / cell_height;
-                self.cells[y][x] = true;
-            }
-
-            if let Button::Mouse(MouseButton::Right) = button {
-                let x = mouse_pos[0] as usize / cell_width;
-                let y = mouse_pos[1] as usize / cell_height;
-                self.cells[y][x] = false;
+                self.cells[y][x] = !self.cells[y][x];
             }
         }
 
@@ -179,10 +162,7 @@ impl<const COL: usize, const ROW: usize> Grid<COL, ROW> {
     fn mouse_cursor(&mut self, mut pos: [f64; 2]) {
         pos[0] -= self.x as f64;
         pos[1] -= self.y as f64;
-        if pos[0] > self.x as f64
-            && pos[0] < self.x as f64 + self.width as f64
-            && pos[1] > self.y as f64
-            && pos[1] < self.y as f64 + self.width as f64
+        if pos[0] > 0.0 && pos[0] < self.width as f64 && pos[1] > 0.0 && pos[1] < self.width as f64
         {
             let cell_width = self.width as usize / COL;
             let cell_height = self.height as usize / ROW;
