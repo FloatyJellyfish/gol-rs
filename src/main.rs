@@ -3,6 +3,10 @@ extern crate graphics;
 extern crate opengl_graphics;
 extern crate piston;
 
+mod ui;
+
+use crate::ui::Btn;
+
 use std::time::SystemTime;
 
 use glutin_window::GlutinWindow;
@@ -16,6 +20,7 @@ use rand::{
     distributions::{Distribution, Standard},
     random, thread_rng, Rng,
 };
+use ui::{HGroup, Widget};
 
 type Colour = [f32; 4];
 
@@ -210,16 +215,6 @@ impl<const COL: usize, const ROW: usize> Grid<COL, ROW> {
     }
 }
 
-trait Btn {
-    fn new(x: u32, y: u32, width: u32, height: u32) -> Self;
-
-    fn render(&self, gl: &mut GlGraphics, args: &RenderArgs);
-
-    fn mouse_cursor(&mut self, pos: [f64; 2]);
-
-    fn is_pressed(&mut self, button: &Button) -> bool;
-}
-
 struct Next {
     x: f64,
     y: f64,
@@ -282,6 +277,26 @@ impl Btn for Next {
 
     fn is_pressed(&mut self, button: &Button) -> bool {
         Button::Mouse(MouseButton::Left) == *button && self.hover
+    }
+}
+
+impl Widget for Next {
+    fn pos(&self) -> [f64; 2] {
+        [self.x, self.y]
+    }
+
+    fn size(&self) -> [f64; 2] {
+        [self.width, self.height]
+    }
+
+    fn set_pos(&mut self, x: f64, y: f64) {
+        self.x = x;
+        self.y = y;
+    }
+
+    fn set_size(&mut self, width: f64, height: f64) {
+        self.width = width;
+        self.height = height;
     }
 }
 
@@ -367,6 +382,26 @@ impl Btn for Play {
             return true;
         }
         false
+    }
+}
+
+impl Widget for Play {
+    fn pos(&self) -> [f64; 2] {
+        [self.x, self.y]
+    }
+
+    fn size(&self) -> [f64; 2] {
+        [self.width, self.height]
+    }
+
+    fn set_pos(&mut self, x: f64, y: f64) {
+        self.x = x;
+        self.y = y;
+    }
+
+    fn set_size(&mut self, width: f64, height: f64) {
+        self.width = width;
+        self.height = height;
     }
 }
 
@@ -549,6 +584,26 @@ impl Btn for Random {
     }
 }
 
+impl Widget for Random {
+    fn pos(&self) -> [f64; 2] {
+        [self.x, self.y]
+    }
+
+    fn size(&self) -> [f64; 2] {
+        [self.width, self.height]
+    }
+
+    fn set_pos(&mut self, x: f64, y: f64) {
+        self.x = x;
+        self.y = y;
+    }
+
+    fn set_size(&mut self, width: f64, height: f64) {
+        self.width = width;
+        self.height = height;
+    }
+}
+
 struct Increase {
     x: f64,
     y: f64,
@@ -614,6 +669,26 @@ impl Btn for Increase {
     }
 }
 
+impl Widget for Increase {
+    fn pos(&self) -> [f64; 2] {
+        [self.x, self.y]
+    }
+
+    fn size(&self) -> [f64; 2] {
+        [self.width, self.height]
+    }
+
+    fn set_pos(&mut self, x: f64, y: f64) {
+        self.x = x;
+        self.y = y;
+    }
+
+    fn set_size(&mut self, width: f64, height: f64) {
+        self.width = width;
+        self.height = height;
+    }
+}
+
 struct Decrease {
     x: f64,
     y: f64,
@@ -676,6 +751,26 @@ impl Btn for Decrease {
             return true;
         }
         false
+    }
+}
+
+impl Widget for Decrease {
+    fn pos(&self) -> [f64; 2] {
+        [self.x, self.y]
+    }
+
+    fn size(&self) -> [f64; 2] {
+        [self.width, self.height]
+    }
+
+    fn set_pos(&mut self, x: f64, y: f64) {
+        self.x = x;
+        self.y = y;
+    }
+
+    fn set_size(&mut self, width: f64, height: f64) {
+        self.width = width;
+        self.height = height;
     }
 }
 
@@ -748,6 +843,26 @@ impl Speed {
     }
 }
 
+impl Widget for Speed {
+    fn pos(&self) -> [f64; 2] {
+        [self.x, self.y]
+    }
+
+    fn size(&self) -> [f64; 2] {
+        [self.width, self.height]
+    }
+
+    fn set_pos(&mut self, x: f64, y: f64) {
+        self.x = x;
+        self.y = y;
+    }
+
+    fn set_size(&mut self, width: f64, height: f64) {
+        self.width = width;
+        self.height = height;
+    }
+}
+
 fn main() {
     let opengl = OpenGL::V3_2;
     let window: &mut GlutinWindow = &mut WindowSettings::new("Gol", [WIDTH, HEIGHT])
@@ -768,6 +883,21 @@ fn main() {
     let mut decrease = Decrease::new(WIDTH / 2, 0, 50, 50);
     let mut speed = Speed::new(WIDTH / 2 + 50, 0, 50, 50, 4, 1, 16, 30);
     let mut increase = Increase::new((WIDTH / 2) + 100, 0, 50, 50);
+    let mut button_row_items: [&mut dyn Widget; 6] = [
+        &mut next,
+        &mut play,
+        &mut random,
+        &mut decrease,
+        &mut speed,
+        &mut increase,
+    ];
+    let _ = HGroup::new(
+        (WIDTH / 2) as f64 - (button_row_items.len() as f64 * 50.0 / 2.0),
+        0.0,
+        button_row_items.len() as f64 * 50.0,
+        50.0,
+        &mut button_row_items,
+    );
 
     let mut mouse_pos = [0.0, 0.0];
     let mut playing = false;
